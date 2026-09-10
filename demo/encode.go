@@ -28,9 +28,10 @@ var (
 	oidBasicConstraints = asn1.ObjectIdentifier{2, 5, 29, 19}
 	oidExtKeyUsage      = asn1.ObjectIdentifier{2, 5, 29, 37}
 
-	oidMTCProofExperiment          = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
-	oidRDNATrustAnchorIDExperiment = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
-	oidMTCCAExperiment             = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
+	oidMTCProofExperiment           = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 0}
+	oidRDNATrustAnchorIDExperiment1 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
+	oidMTCCAExperiment              = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
+	oidRDNATrustAnchorIDExperiment2 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 3}
 
 	oidAlgUnsigned  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
 	oidRDNAUnsigned = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 25, 1}
@@ -43,6 +44,8 @@ var (
 	oidMLDSA44         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
 	oidMLDSA65         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
 	oidMLDSA87         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
+
+	tagRelativeOID = cbasn1.Tag(13)
 )
 
 func addASN1ImplicitString(bb *cryptobyte.Builder, tag cbasn1.Tag, b []byte) {
@@ -73,14 +76,21 @@ func addUnsignedSigAlg(b *cryptobyte.Builder) {
 	})
 }
 
-func addX509Name(b *cryptobyte.Builder, id TrustAnchorID) {
+func addX509Name(b *cryptobyte.Builder, version DraftVersion, id TrustAnchorID) {
 	b.AddASN1(cbasn1.SEQUENCE, func(dn *cryptobyte.Builder) {
 		dn.AddASN1(cbasn1.SET, func(rdn *cryptobyte.Builder) {
 			rdn.AddASN1(cbasn1.SEQUENCE, func(attr *cryptobyte.Builder) {
-				attr.AddASN1ObjectIdentifier(oidRDNATrustAnchorIDExperiment)
-				attr.AddASN1(cbasn1.UTF8String, func(val *cryptobyte.Builder) {
-					val.AddBytes([]byte(id.String()))
-				})
+				if version >= VersionPlants06 {
+					attr.AddASN1ObjectIdentifier(oidRDNATrustAnchorIDExperiment2)
+					attr.AddASN1(tagRelativeOID, func(val *cryptobyte.Builder) {
+						val.AddBytes(id)
+					})
+				} else {
+					attr.AddASN1ObjectIdentifier(oidRDNATrustAnchorIDExperiment1)
+					attr.AddASN1(cbasn1.UTF8String, func(val *cryptobyte.Builder) {
+						val.AddBytes([]byte(id.String()))
+					})
+				}
 			})
 		})
 	})
@@ -255,7 +265,7 @@ func addExtensions(b *cryptobyte.Builder, config *CertConfigBase, mtcCA *mtcCAIn
 	})
 }
 
-func AddTBSCertificate(b *cryptobyte.Builder, issuer TrustAnchorID, serial uint64, entry *EntryConfig, certConfig *CertificateConfig) {
+func AddTBSCertificate(b *cryptobyte.Builder, version DraftVersion, issuer TrustAnchorID, serial uint64, entry *EntryConfig, certConfig *CertificateConfig) {
 	b.AddASN1(cbasn1.SEQUENCE, func(tbs *cryptobyte.Builder) {
 		addX509V3Version(tbs)
 		tbs.AddASN1Uint64(serial)
@@ -264,7 +274,7 @@ func AddTBSCertificate(b *cryptobyte.Builder, issuer TrustAnchorID, serial uint6
 		} else {
 			addMTCProofSigAlg(tbs)
 		}
-		addX509Name(tbs, issuer)
+		addX509Name(tbs, version, issuer)
 		addValidity(tbs, &entry.CertConfigBase)
 		addSubject(tbs, entry)
 		tbs.AddBytes(entry.PublicKey)
@@ -300,7 +310,7 @@ func MarshalTBSCertificateLogEntry(version DraftVersion, issuer TrustAnchorID, e
 
 	marshalContents := func(tbs *cryptobyte.Builder) {
 		addX509V3Version(tbs)
-		addX509Name(tbs, issuer)
+		addX509Name(tbs, version, issuer)
 		addValidity(tbs, &entry.CertConfigBase)
 		addSubject(tbs, entry)
 		// Starting draft-plants-02, the public key algorithm is included in
@@ -368,7 +378,7 @@ func CreateCertificate(config *CAConfig, issuanceLog MerkleTree, cosigners []*Co
 			}
 			serial |= uint64(config.LogNumber) << 48
 		}
-		AddTBSCertificate(cert, config.ID, serial, entry, certConfig)
+		AddTBSCertificate(cert, config.Version, config.ID, serial, entry, certConfig)
 		if len(certConfig.OverrideSignatureAlgorithm) != 0 {
 			cert.AddBytes(certConfig.OverrideSignatureAlgorithm)
 		} else {
@@ -470,7 +480,7 @@ func CreateCACertificate(config *CAConfig, cosigner *Cosigner) ([]byte, error) {
 			addUnsignedSigAlg(tbs)
 			addUnsignedX509NamePlaceholder(tbs) // No issuer
 			addValidity(tbs, &config.CACert.CertConfigBase)
-			addX509Name(tbs, config.ID) // Subject
+			addX509Name(tbs, config.Version, config.ID) // Subject
 			tbs.AddBytes(spki)
 
 			addExtensions(tbs, &config.CACert.CertConfigBase, &mtcCAInfo{

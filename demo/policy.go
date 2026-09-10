@@ -60,7 +60,7 @@ type TrustedSubtree struct {
 	Hash       HashValue
 }
 
-func caIDFromX509Name(name []byte) (TrustAnchorID, error) {
+func parseSingleAttributeX509Name(name []byte, wantOID asn1.ObjectIdentifier) (cryptobyte.String, error) {
 	s := cryptobyte.String(name)
 	var dn, rdn, attr cryptobyte.String
 	var attrOID asn1.ObjectIdentifier
@@ -71,21 +71,41 @@ func caIDFromX509Name(name []byte) (TrustAnchorID, error) {
 		!attr.ReadASN1ObjectIdentifier(&attrOID) {
 		return nil, errors.New("malformed X.509 name")
 	}
-	if !attrOID.Equal(oidRDNATrustAnchorIDExperiment) {
-		return nil, fmt.Errorf("unexpected X.509 name attribute %s", attrOID)
-	}
-	var utf8Val cryptobyte.String
-	if !attr.ReadASN1(&utf8Val, cbasn1.UTF8String) || !attr.Empty() {
-		return nil, errors.New("malformed trust anchor ID UTF8String")
-	}
-	id, ok := TrustAnchorIDFromString(string(utf8Val))
-	if !ok {
-		return nil, fmt.Errorf("invalid trust anchor ID string %q", string(utf8Val))
+	if !attrOID.Equal(wantOID) {
+		return nil, fmt.Errorf("unexpected X.509 name attribute %s, wanted %s", attrOID, wantOID)
 	}
 	if !rdn.Empty() || !dn.Empty() {
 		return nil, errors.New("extra attributes in X.509 name")
 	}
-	return id, nil
+	return attr, nil
+}
+
+func caIDFromX509Name(version DraftVersion, name []byte) (TrustAnchorID, error) {
+	if version <= VersionPlants05 {
+		attr, err := parseSingleAttributeX509Name(name, oidRDNATrustAnchorIDExperiment1)
+		if err != nil {
+			return nil, err
+		}
+		var utf8Val cryptobyte.String
+		if !attr.ReadASN1(&utf8Val, cbasn1.UTF8String) || !attr.Empty() {
+			return nil, errors.New("malformed trust anchor ID UTF8String")
+		}
+		id, ok := TrustAnchorIDFromString(string(utf8Val))
+		if !ok {
+			return nil, fmt.Errorf("invalid trust anchor ID string %q", string(utf8Val))
+		}
+		return id, nil
+	}
+
+	attr, err := parseSingleAttributeX509Name(name, oidRDNATrustAnchorIDExperiment2)
+	if err != nil {
+		return nil, err
+	}
+	var relativeOIDVal cryptobyte.String
+	if !attr.ReadASN1(&relativeOIDVal, tagRelativeOID) || !attr.Empty() {
+		return nil, errors.New("malformed trust anchor ID RELATIVE-OID")
+	}
+	return TrustAnchorID(relativeOIDVal), nil
 }
 
 func isEmptyOrASN1Null(s cryptobyte.String) bool {
@@ -93,7 +113,7 @@ func isEmptyOrASN1Null(s cryptobyte.String) bool {
 }
 
 func (p *Policy) AddCA(ca *x509.Certificate) error {
-	caID, err := caIDFromX509Name(ca.RawSubject)
+	caID, err := caIDFromX509Name(p.Version, ca.RawSubject)
 	if err != nil {
 		return fmt.Errorf("failed to extract CA ID from subject: %w", err)
 	}
