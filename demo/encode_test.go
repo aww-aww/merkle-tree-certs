@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/hex"
 	"testing"
@@ -179,5 +180,61 @@ func TestMarshalTBSCertificate(t *testing.T) {
 		} else if got := hex.EncodeToString(log); got != tt.expectedLogEntryHex {
 			t.Errorf("%d. MarshalTBSCertificateLogEntry() gave %s, wanted %s", i, got, tt.expectedLogEntryHex)
 		}
+	}
+}
+
+func TestMTCProofSignaturesLengthPrefix(t *testing.T) {
+	tests := []struct {
+		name      string
+		version   DraftVersion
+		length    int
+		prefixLen int
+		wantError bool
+	}{
+		{"plants-05", VersionPlants05, 123, 2, false},
+		{"plants-05-too-long", VersionPlants05, 1 << 16, 2, true},
+		{"plants-06", VersionPlants06, 123, 3, false},
+		{"plants-06-above-old-limit", VersionPlants06, 1 << 16, 3, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := bytes.Repeat([]byte{0x42}, tt.length)
+			b := cryptobyte.NewBuilder(nil)
+			addMTCProofSignatures(b, tt.version, func(child *cryptobyte.Builder) {
+				child.AddBytes(payload)
+			})
+			encoded, err := b.Bytes()
+			if tt.wantError {
+				if err == nil {
+					t.Fatal("encoding unexpectedly succeeded")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("encoding failed: %v", err)
+			}
+			if len(encoded) != tt.prefixLen+len(payload) {
+				t.Fatalf("encoded length = %d, want %d", len(encoded), tt.prefixLen+len(payload))
+			}
+
+			in := cryptobyte.String(encoded)
+			var decoded cryptobyte.String
+			if !readMTCProofSignatures(&in, tt.version, &decoded) || !in.Empty() {
+				t.Fatal("decoding failed")
+			}
+			if !bytes.Equal(decoded, payload) {
+				t.Fatal("decoded payload does not match input")
+			}
+
+			otherVersion := VersionPlants05
+			if tt.version == VersionPlants05 {
+				otherVersion = VersionPlants06
+			}
+			in = encoded
+			if readMTCProofSignatures(&in, otherVersion, &decoded) && in.Empty() {
+				t.Fatal("decoding with another draft version unexpectedly succeeded")
+			}
+		})
 	}
 }

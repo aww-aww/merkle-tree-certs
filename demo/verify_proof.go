@@ -17,6 +17,13 @@ type parsedSignature struct {
 	signature  []byte
 }
 
+func readMTCProofSignatures(s *cryptobyte.String, version DraftVersion, out *cryptobyte.String) bool {
+	if version >= VersionPlants06 {
+		return s.ReadUint24LengthPrefixed(out)
+	}
+	return s.ReadUint16LengthPrefixed(out)
+}
+
 func hashU16(dst hash.Hash, v uint16) {
 	dst.Write([]byte{byte(v >> 8), byte(v)})
 }
@@ -91,7 +98,7 @@ func VerifyMTCProof(cert *x509.Certificate, policy *Policy, version DraftVersion
 		!proofStr.ReadUint48(&start) ||
 		!proofStr.ReadUint48(&end) ||
 		!proofStr.ReadUint16LengthPrefixed(&inclusionProof) ||
-		!proofStr.ReadUint16LengthPrefixed(&sigs) ||
+		!readMTCProofSignatures(&proofStr, version, &sigs) ||
 		!proofStr.Empty() {
 		return nil, fmt.Errorf("malformed MTCProof")
 	}
