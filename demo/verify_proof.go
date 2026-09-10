@@ -66,7 +66,7 @@ type VerifyResult struct {
 }
 
 func VerifyMTCProof(cert *x509.Certificate, policy *Policy, version DraftVersion) (*VerifyResult, error) {
-	caID, err := caIDFromX509Name(cert.RawIssuer)
+	caID, err := caIDFromX509Name(policy.Version, cert.RawIssuer)
 	if err != nil {
 		return nil, fmt.Errorf("issuer not an MTC CA: %w", err)
 	}

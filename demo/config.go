@@ -25,6 +25,7 @@ const (
 	VersionPlants02
 	VersionPlants04
 	VersionPlants05
+	VersionPlants06
 )
 
 func (v DraftVersion) String() string {
@@ -41,6 +42,8 @@ func (v DraftVersion) String() string {
 		return "plants-04"
 	case VersionPlants05:
 		return "plants-05"
+	case VersionPlants06:
+		return "plants-06"
 	}
 	panic(fmt.Sprintf("unknown version %d", v))
 }
@@ -68,6 +71,8 @@ func DraftVersionFromString(s string) (v DraftVersion, ok bool) {
 		return VersionPlants04, true
 	case "plants-05":
 		return VersionPlants05, true
+	case "plants-06":
+		return VersionPlants06, true
 
 	default:
 		return 0, false

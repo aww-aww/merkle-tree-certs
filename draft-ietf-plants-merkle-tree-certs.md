@@ -987,16 +987,10 @@ The attribute's value is a RELATIVE-OID containing the trust anchor ID's ASN.1 r
 1.3.6.1.5.5.7.25.TBD=#0d0481fd5901
 ~~~
 
-For initial experimentation, early implementations of this design will:
-
-1. Use UTF8String to represent the attribute's value rather than RELATIVE-OID. The UTF8String contains the trust anchor ID's ASCII representation, e.g. `32473.1`.
-
-1. Use the OID 1.3.6.1.4.1.44363.47.1 instead of `id-rdna-trustAnchorID`. Cloudflare has kindly donated the 1.3.6.1.4.1.44363.47 OID arc for use in this document.
-
-For example, the distinguished name for a CA with ID `32473.1` would be represented in syntax of {{?RFC4514}} as:
+For initial experimentation, early implementations of this design will use the OID 1.3.6.1.4.1.44363.47.3 instead of `id-rdna-trustAnchorID`. Cloudflare has kindly donated the 1.3.6.1.4.1.44363.47 OID arc for use in this document. For example, the distinguished name for an experimental CA with ID `32473.1` would be represented in syntax of {{?RFC4514}} as:
 
 ~~~
-1.3.6.1.4.1.44363.47.1=#0c0733323437332e31
+1.3.6.1.4.1.44363.47.3=#0d0481fd5901
 ~~~
 
 ## Issuance Logs
@@ -2753,7 +2747,7 @@ In draft-04, there is no fast issuance mode. In draft-05, frequent, non-landmark
 ## Since draft-ietf-plants-merkle-tree-certs-05
 {:numbered="false"}
 
-- Renamed MerkleTreeCertEntry, etc., structures to MTCLogEntry to be consistent with MTCProof, shorter, and help disambiguate the many English meanings of "entry"
+- Renamed MerkleTreeCertEntry, etc., structures to MTCLogEntry to be consistent with MTCProof, shorter, and help disambiguate the many English meanings of "entry".
 
 - Fixed one of the accumulated test vectors to better reflect one of the edge cases in subtree covering.
 
@@ -2765,12 +2759,14 @@ In draft-04, there is no fast issuance mode. In draft-05, frequent, non-landmark
 
 - Give an exact procedure for selecting the landmark and covering subtree when constructing a landmark-relative certificate.
 
-- Prune the pruning discussion. It's really a property of the log serving protocol and is better described in {{MTC-TLOG}} and {{TLOG-TILES}}
+- Prune the pruning discussion. It's really a property of the log serving protocol and is better described in {{MTC-TLOG}} and {{TLOG-TILES}}.
 
 - Fix the maximum log index to account for also `end` being 48-bit.
 
-- Discuss a potential overflow in the valid subtree definition
+- Discuss a potential overflow in the valid subtree definition.
 
 - Describe how a party holding a standalone certificate can construct the corresponding landmark-relative certificate itself.
 
-- Added test vectors for subtree algorithms in larger trees
+- Added test vectors for subtree algorithms in larger trees.
+
+- Align the experimental OID with the final one in the X.509 name construction in using RELATIVE-OID directly.
