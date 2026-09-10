@@ -1299,7 +1299,7 @@ struct {
     uint48 start;
     uint48 end;
     HashValue inclusion_proof<0..2^16-1>;
-    SubtreeSignature signatures<0..2^16-1>;
+    SubtreeSignature signatures<0..2^24-1>;
 } MTCProof;
 ~~~
 
@@ -2746,6 +2746,8 @@ In draft-04, there is no fast issuance mode. In draft-05, frequent, non-landmark
 
 ## Since draft-ietf-plants-merkle-tree-certs-05
 {:numbered="false"}
+
+- Use 24-bit length prefix for MTCProof subtree signatures.
 
 - Renamed MerkleTreeCertEntry, etc., structures to MTCLogEntry to be consistent with MTCProof, shorter, and help disambiguate the many English meanings of "entry".
 

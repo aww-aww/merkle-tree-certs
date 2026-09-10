@@ -290,6 +290,14 @@ func addEmptyMTCEntryExtensions(b *cryptobyte.Builder, version DraftVersion) {
 	}
 }
 
+func addMTCProofSignatures(b *cryptobyte.Builder, version DraftVersion, f func(*cryptobyte.Builder)) {
+	if version >= VersionPlants06 {
+		b.AddUint24LengthPrefixed(f)
+	} else {
+		b.AddUint16LengthPrefixed(f)
+	}
+}
+
 func MarshalNullEntry(version DraftVersion) []byte {
 	b := cryptobyte.NewBuilder(nil)
 	// Starting in draft 04, MerkleTreeCertEntry is prefixed with a
@@ -417,7 +425,7 @@ func CreateCertificate(config *CAConfig, issuanceLog MerkleTree, cosigners []*Co
 				certSig.AddUint64(end)
 			}
 			certSig.AddUint16LengthPrefixed(func(child *cryptobyte.Builder) { child.AddBytes(proof) })
-			certSig.AddUint16LengthPrefixed(func(cosigs *cryptobyte.Builder) {
+			addMTCProofSignatures(certSig, config.Version, func(cosigs *cryptobyte.Builder) {
 				// plants-04 canonicalizes the cosigner order.
 				if !certConfig.DontSortCosigners && config.Version >= VersionPlants04 {
 					cosigners = slices.SortedFunc(slices.Values(cosigners), func(a, b *Cosigner) int {
