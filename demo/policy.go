@@ -125,9 +125,14 @@ func (p *Policy) AddCA(ca *x509.Certificate) error {
 		return fmt.Errorf("CA %s already defined", caID)
 	}
 
+	wantOID := oidMTCCAWithSHA256Experiment
+	if p.Version <= VersionPlants05 {
+		wantOID = oidMTCCAExperiment
+	}
+
 	var caExt *pkix.Extension
 	for i := range ca.Extensions {
-		if ca.Extensions[i].Id.Equal(oidMTCCAExperiment) {
+		if ca.Extensions[i].Id.Equal(wantOID) {
 			caExt = &ca.Extensions[i]
 			break
 		}
@@ -140,10 +145,19 @@ func (p *Policy) AddCA(ca *x509.Certificate) error {
 	var seq, logHashSeq, sigAlgSeq cryptobyte.String
 	var logHashOID, sigAlgOID asn1.ObjectIdentifier
 	minSerial, maxSerial := uint64(0), uint64(math.MaxUint64)
-	if !extVal.ReadASN1(&seq, cbasn1.SEQUENCE) || !extVal.Empty() ||
-		!seq.ReadASN1(&logHashSeq, cbasn1.SEQUENCE) ||
-		!logHashSeq.ReadASN1ObjectIdentifier(&logHashOID) ||
-		!seq.ReadASN1(&sigAlgSeq, cbasn1.SEQUENCE) ||
+	if !extVal.ReadASN1(&seq, cbasn1.SEQUENCE) || !extVal.Empty() {
+		return fmt.Errorf("malformed MTC CA extension")
+	}
+	if p.Version <= VersionPlants05 {
+		if !seq.ReadASN1(&logHashSeq, cbasn1.SEQUENCE) ||
+			!logHashSeq.ReadASN1ObjectIdentifier(&logHashOID) {
+			return fmt.Errorf("malformed MTC CA extension")
+		}
+		if !logHashOID.Equal(oidSHA256) || !isEmptyOrASN1Null(logHashSeq) {
+			return errors.New("unsupported log hash algorithm")
+		}
+	}
+	if !seq.ReadASN1(&sigAlgSeq, cbasn1.SEQUENCE) ||
 		!sigAlgSeq.ReadASN1ObjectIdentifier(&sigAlgOID) ||
 		!seq.ReadASN1Integer(&minSerial) {
 		return fmt.Errorf("malformed MTC CA extension")
@@ -155,10 +169,6 @@ func (p *Policy) AddCA(ca *x509.Certificate) error {
 	}
 	if !seq.Empty() {
 		return fmt.Errorf("malformed MTC CA extension")
-	}
-
-	if !logHashOID.Equal(oidSHA256) || !isEmptyOrASN1Null(logHashSeq) {
-		return errors.New("unsupported log hash algorithm")
 	}
 
 	var sigAlg SignatureAlgorithm
