@@ -1425,6 +1425,8 @@ This information may be obtained from a CA certificate structure, defined in {{r
 
 * The CA ID is determined from the certificate's subject.
 
+* The log hash algorithm is determined from the type of the Merkle Tree CA extension.
+
 * The CA cosigner is determined from the certificate's subject public key and Merkle Tree CA extension. The CA's cosigner ID is the same as its CA ID. The relying party incorporates this cosigner into its cosigner policy based on the guidance in {{trusted-cosigners}}.
 
 * No trusted subtrees are directly represented by the CA certificate structure, but the relying party MAY incorporate trusted subtrees from out-of-band information.
