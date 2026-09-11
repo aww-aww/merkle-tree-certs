@@ -32,6 +32,7 @@ var (
 	oidRDNATrustAnchorIDExperiment1 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 1}
 	oidMTCCAExperiment              = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 2}
 	oidRDNATrustAnchorIDExperiment2 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 3}
+	oidMTCCAWithSHA256Experiment    = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 44363, 47, 4}
 
 	oidAlgUnsigned  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 36}
 	oidRDNAUnsigned = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 25, 1}
@@ -229,13 +230,20 @@ func addExtensions(b *cryptobyte.Builder, config *CertConfigBase, mtcCA *mtcCAIn
 
 		if mtcCA != nil {
 			exts.AddASN1(cbasn1.SEQUENCE, func(ext *cryptobyte.Builder) {
-				ext.AddASN1ObjectIdentifier(oidMTCCAExperiment)
+				// In plants-05 and earlier, the log hash was separate from the top-level OID.
+				if mtcCA.version <= VersionPlants05 {
+					ext.AddASN1ObjectIdentifier(oidMTCCAExperiment)
+				} else {
+					ext.AddASN1ObjectIdentifier(oidMTCCAWithSHA256Experiment)
+				}
 				ext.AddASN1Boolean(true)
 				ext.AddASN1(cbasn1.OCTET_STRING, func(extVal *cryptobyte.Builder) {
 					extVal.AddASN1(cbasn1.SEQUENCE, func(seq *cryptobyte.Builder) {
-						seq.AddASN1(cbasn1.SEQUENCE, func(logHash *cryptobyte.Builder) {
-							logHash.AddASN1ObjectIdentifier(oidSHA256)
-						})
+						if mtcCA.version <= VersionPlants05 {
+							seq.AddASN1(cbasn1.SEQUENCE, func(logHash *cryptobyte.Builder) {
+								logHash.AddASN1ObjectIdentifier(oidSHA256)
+							})
+						}
 						seq.AddASN1(cbasn1.SEQUENCE, func(sigAlg *cryptobyte.Builder) {
 							switch mtcCA.cosigner.SignatureAlgorithm {
 							case SignatureAlgorithmP256WithSHA256:

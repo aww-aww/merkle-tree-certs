@@ -1190,13 +1190,13 @@ If the CA operator additionally operates a directly-signing X.509 CA, that CA ke
 
 ## Representing Certification Authorities
 
-This section defines the X.509 Certificate {{!RFC5280}} representation of a Merkle Tree Certificate CA. It identifies the CA cosigner ({{certification-authority-cosigners}}) and associated issuance logs. This information is encoded as follows:
+This section defines the X.509 Certificate {{!RFC5280}} representation of a Merkle Tree CA. It identifies the CA cosigner ({{certification-authority-cosigners}}) and associated issuance logs. This information is encoded as follows:
 
 * The `subject` field MUST be the CA ID as a PKIX distinguished name, as described in {{ca-ids}}.
 
 * The `subjectPublicKeyInfo` field MUST be the public key of the CA cosigner {{certification-authority-cosigners}}.
 
-* The `extensions` field MUST contain a critical extension of type id-pe-mtcCertificationAuthority, defined below.
+* The `extensions` field MUST contain a critical Merkle Tree CA extension. This is defined below.
 
 * The subject key identifier extension ({{Section 4.2.1.2 of !RFC5280}}), if present, SHOULD be set to the CA ID {{ca-ids}}. The CA ID is encoded in its binary representation, as defined in {{Section 3 of !I-D.ietf-tls-trust-anchor-ids}}.
 
@@ -1206,16 +1206,18 @@ Other fields and extensions in {{!RFC5280}} apply unmodified. In particular:
 
 * The basic constraints extension ({{Section 4.2.1.9 of !RFC5280}}) MUST be present and set the `cA` field to TRUE.
 
-The id-pe-mtcCertificationAuthority extension is defined below. This extension indicates that the subject of the certificate is a CA that issues Merkle Tree Certificates. If present, it MUST be marked as critical.
+The Merkle Tree CA extension defines the remaining parameters specific to this protocol. It indicates that the subject of the certificate is a CA that issues Merkle Tree Certificates. If present, it MUST be marked as critical. The extension type identifies the Merkle Tree construction, and the contents define additional parameters of the CA cosigner.
+
+This document defines one extension type, id-pe-mtcCertificationAuthority-SHA256, which indicates hashing with SHA-256 {{!SHS}}. Other documents MAY define corresponding extensions for other hash functions or new versions of the tree construction.
 
 ~~~asn.1
-id-pe-mtcCertificationAuthority OBJECT IDENTIFIER ::= {
+id-pe-mtcCertificationAuthority-SHA256 OBJECT IDENTIFIER ::= {
     iso(1) identified-organization(3) dod(6) internet(1) security(5)
     mechanisms(5) pkix(7) pe(1) TBD }
 
-ext-mtcCertificationAuthority EXTENSION ::= {
+ext-mtcCertificationAuthority-SHA256 EXTENSION ::= {
     SYNTAX MTCCertificationAuthority
-    IDENTIFIED BY id-pe-mtcCertificationAuthority
+    IDENTIFIED BY id-pe-mtcCertificationAuthority-SHA256
     CRITICALITY TRUE
 }
 
@@ -1223,18 +1225,15 @@ ext-mtcCertificationAuthority EXTENSION ::= {
 mtcMaxSerial INTEGER ::= 18446744073709551615
 
 MTCCertificationAuthority ::= SEQUENCE {
-    logHash   AlgorithmIdentifier{DIGEST-ALGORITHM, {...}},
     sigAlg    AlgorithmIdentifier{SIGNATURE-ALGORITHM, {...}},
     minSerial INTEGER (0..mtcMaxSerial),
     maxSerial INTEGER (0..mtcMaxSerial)
 }
 ~~~
 
-For initial experimentation, early implementations of this design will use the OID 1.3.6.1.4.1.44363.47.2 instead of `id-pe-mtcCertificationAuthority`. Cloudflare has kindly donated the 1.3.6.1.4.1.44363.47 OID arc for use in this document.
+For initial experimentation, early implementations of this design will use the OID 1.3.6.1.4.1.44363.47.4 instead of `id-pe-mtcCertificationAuthority-SHA256`. Cloudflare has kindly donated the 1.3.6.1.4.1.44363.47 OID arc for use in this document.
 
 The fields of an MTCCertificationAuthority structure are defined as follows:
-
-* `logHash` describes the hash algorithm used by all logs operated by this CA. For example, if the hash is SHA-256, it would be `mda-sha256` as defined in {{Section 8 of !RFC5912}}.
 
 * `sigAlg` is the CA cosigner's signature algorithm ({{signature-algorithms}}).
 
@@ -1244,7 +1243,7 @@ If this extension is present, the key described in `subjectPublicKeyInfo` is a C
 
 This extension indicates the subtree signature format defined in {{signature-format}}. If a later version of the protocol defines a new format, this SHOULD be represented in CA certificates with a new extension type.
 
-A CA certificate using this format SHOULD NOT be self-signed by the Merkle Tree Certificate CA. Doing so would require writing the information in the issuance log. Instead, if used to represent a trust anchor, the certificate SHOULD be an unsigned certificate {{!RFC9925}}.
+A CA certificate using this format SHOULD NOT be self-signed by the CA. Doing so would require writing the information in the issuance log. Instead, if used to represent a trust anchor, the certificate SHOULD be an unsigned certificate {{!RFC9925}}.
 
 # Certificates
 
@@ -1426,9 +1425,7 @@ This information may be obtained from a CA certificate structure, defined in {{r
 
 * The CA ID is determined from the certificate's subject.
 
-* The log hash algorithm is determined from the id-pe-mtcCertificationAuthority extension.
-
-* The CA cosigner is determined from the certificate's subject public key and id-pe-mtcCertificationAuthority extension. The CA's cosigner ID is the same as its CA ID. The relying party incorporates this cosigner into its cosigner policy based on the guidance in {{trusted-cosigners}}.
+* The CA cosigner is determined from the certificate's subject public key and Merkle Tree CA extension. The CA's cosigner ID is the same as its CA ID. The relying party incorporates this cosigner into its cosigner policy based on the guidance in {{trusted-cosigners}}.
 
 * No trusted subtrees are directly represented by the CA certificate structure, but the relying party MAY incorporate trusted subtrees from out-of-band information.
 
@@ -1924,9 +1921,9 @@ IANA is requested to add the following entry to the "SMI Security for PKIX Algor
 
 IANA is requested to add the following entry to the "SMI Security for PKIX Certificate Extension" registry {{?RFC7299}}:
 
-| Decimal | Description                      | References |
-|---------|----------------------------------|------------|
-| TBD     | id-pe-mtcCertificationAuthority | [this-RFC] |
+| Decimal | Description                            | References |
+|---------|----------------------------------------|------------|
+| TBD     | id-pe-mtcCertificationAuthority-SHA256 | [this-RFC] |
 
 ## Relative Distinguished Name Attribute
 
@@ -2016,13 +2013,13 @@ at-trustAnchorID ATTRIBUTE ::= {
     IDENTIFIED BY id-rdna-trustAnchorID
 }
 
-id-pe-mtcCertificationAuthority OBJECT IDENTIFIER ::= {
+id-pe-mtcCertificationAuthority-SHA256 OBJECT IDENTIFIER ::= {
     iso(1) identified-organization(3) dod(6) internet(1) security(5)
     mechanisms(5) pkix(7) pe(1) TBD }
 
-ext-mtcCertificationAuthority EXTENSION ::= {
+ext-mtcCertificationAuthority-SHA256 EXTENSION ::= {
     SYNTAX MTCCertificationAuthority
-    IDENTIFIED BY id-pe-mtcCertificationAuthority
+    IDENTIFIED BY id-pe-mtcCertificationAuthority-SHA256
     CRITICALITY TRUE
 }
 
@@ -2030,7 +2027,6 @@ ext-mtcCertificationAuthority EXTENSION ::= {
 mtcMaxSerial INTEGER ::= 18446744073709551615
 
 MTCCertificationAuthority ::= SEQUENCE {
-    logHash   AlgorithmIdentifier{DIGEST-ALGORITHM, {...}},
     sigAlg    AlgorithmIdentifier{SIGNATURE-ALGORITHM, {...}},
     minSerial INTEGER (0..mtcMaxSerial),
     maxSerial INTEGER (0..mtcMaxSerial)
@@ -2772,3 +2768,5 @@ In draft-04, there is no fast issuance mode. In draft-05, frequent, non-landmark
 - Added test vectors for subtree algorithms in larger trees.
 
 - Align the experimental OID with the final one in the X.509 name construction in using RELATIVE-OID directly.
+
+- Lifted the tree hash into the MTC CA extension OID, so it can capture new tree constructions more generally.
