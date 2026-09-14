@@ -2470,8 +2470,8 @@ Given range `[0x0, 0x800000000000)`, the subtrees are:
 
 Given range `[0x500000000000, 0xd00000000000)`, the subtrees are:
 
-* `[0x400000000000, 0x800000000000)`
-* `[0x800000000000, 0xd00000000000)`
+* `[0x500000000000, 0x900000000000)`
+* `[0x900000000000, 0xd00000000000)`
 
 Given range `[0x7fffffffffff, 0x800000000001)`, the subtrees are:
 
